@@ -21,7 +21,14 @@ export function advanceProjectGeneration(projectDir: string = getProjectDir()): 
   const scope = resolveProjectScope(projectDir);
   projectGenerations.set(scope, (projectGenerations.get(scope) ?? 0) + 1);
 }
-const DEFAULT_CONTENT_DIR = join(homedir(), ".claude", "context-mode", "content");
+
+function defaultBaseDir(): string {
+  if (process.platform === "win32") {
+    return join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "context-mode");
+  }
+  return join(process.env.XDG_STATE_HOME || join(homedir(), ".local", "state"), "context-mode");
+}
+const DEFAULT_CONTENT_DIR = join(defaultBaseDir(), "content");
 const DEFAULT_MAX_OPEN_STORES = 8;
 
 function getMaxOpenStores(): number {

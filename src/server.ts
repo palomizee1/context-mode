@@ -65,7 +65,10 @@ export function createContextModeServer(): McpServer {
     { name: "context-mode", version: VERSION },
     { capabilities: { tools: {} } },
   );
+  // CONTEXT_MODE_TOOLS: optional comma-separated allow-list of tool names to expose.
+  const allow = process.env.CONTEXT_MODE_TOOLS?.split(",").map((s) => s.trim()).filter(Boolean);
   for (const tool of REGISTERED_CTX_TOOLS) {
+    if (allow && allow.length > 0 && !allow.includes(tool.name)) continue;
     (instance.registerTool as any)(tool.name, tool.config, tool.handler);
   }
   return instance;

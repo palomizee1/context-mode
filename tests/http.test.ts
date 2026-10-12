@@ -109,6 +109,19 @@ describe("standalone MCP HTTP server", () => {
     expect(body.result?.content?.[0]?.text).toContain("context-mode doctor");
   });
 
+  test("CONTEXT_MODE_TOOLS limits the tools that are exposed", async () => {
+    const saved = process.env.CONTEXT_MODE_TOOLS;
+    process.env.CONTEXT_MODE_TOOLS = "ctx_search, ctx_execute";
+    try {
+      const response = await createContextModeHttpHandler().fetch(modernRequest("tools/list"));
+      const body = await response.json() as { result?: { tools?: Array<{ name: string }> } };
+      expect(body.result?.tools?.map((tool) => tool.name)).toEqual(["ctx_execute", "ctx_search"]);
+    } finally {
+      if (saved === undefined) delete process.env.CONTEXT_MODE_TOOLS;
+      else process.env.CONTEXT_MODE_TOOLS = saved;
+    }
+  });
+
   test("serves deterministic modern tools/list metadata", async () => {
     const handler = createContextModeHttpHandler();
     const response = await handler.fetch(modernRequest("tools/list"));

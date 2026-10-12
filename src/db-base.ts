@@ -48,6 +48,11 @@ export function closeDB(db: DatabaseInstance): void {
   try { db.close(); } catch {}
 }
 
+// Transient SQLite failures worth retrying. SQLITE_IOERR is usually a momentary
+// filesystem stall (on macOS: Spotlight/iCloud touching the file, WAL hiccups).
+// It must NOT be treated as corruption: that path renames the DB away.
+const TRANSIENT_ERROR_PATTERNS = ["SQLITE_BUSY", "database is locked", "SQLITE_IOERR", "disk I/O error"];
+
 export function withRetry<T>(fn: () => T, delays: number[] = [100, 500, 2000]): T {
   let lastError: Error | undefined;
   for (let attempt = 0; attempt <= delays.length; attempt++) {
@@ -55,14 +60,19 @@ export function withRetry<T>(fn: () => T, delays: number[] = [100, 500, 2000]): 
       return fn();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (!msg.includes("SQLITE_BUSY") && !msg.includes("database is locked")) throw err;
+      if (!TRANSIENT_ERROR_PATTERNS.some((p) => msg.includes(p))) throw err;
       lastError = err instanceof Error ? err : new Error(msg);
       if (attempt < delays.length) {
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delays[attempt]);
       }
     }
   }
-  throw new Error(`SQLITE_BUSY: database is locked after ${delays.length} retries. Original error: ${lastError?.message}`);
+  // Name the class we actually exhausted on, so the caller chases the right cause.
+  const failure = lastError?.message ?? "";
+  const cause = failure.includes("SQLITE_IOERR") || failure.includes("disk I/O error")
+    ? "SQLITE_IOERR: disk I/O error"
+    : "SQLITE_BUSY: database is locked";
+  throw new Error(`${cause} after ${delays.length} retries. Original error: ${lastError?.message}`);
 }
 
 export function isSQLiteCorruptionError(msg: string): boolean {

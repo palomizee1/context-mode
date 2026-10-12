@@ -75,7 +75,13 @@ export function applyWALPragmas(db: SqliteDatabase): void {
   db.pragma("synchronous = NORMAL");
   db.pragma("busy_timeout = 5000");
   db.pragma("secure_delete = ON");
-  try { db.pragma("mmap_size = 268435456"); } catch {}
+  // mmap is opt-in (CONTEXT_MODE_MMAP_SIZE=<bytes>): several server processes can
+  // share a persist-mode DB, and a fault on a mapping a sibling truncated or
+  // replaced is an uncatchable signal rather than an error (upstream #1056).
+  const mmapSize = Number(process.env.CONTEXT_MODE_MMAP_SIZE ?? "0");
+  if (Number.isFinite(mmapSize) && mmapSize > 0) {
+    try { db.pragma(`mmap_size = ${Math.floor(mmapSize)}`); } catch {}
+  }
 }
 
 export function cleanOrphanedWALFiles(dbPath: string): void {
@@ -100,9 +106,25 @@ export function deleteDBFiles(dbPath: string): void {
   }
 }
 
+// No TRUNCATE checkpoint on close: it mutated a WAL that sibling processes were
+// still using (upstream #1056). SQLite checkpoints and removes the WAL when the
+// last connection closes, and the PASSIVE timer below bounds it meanwhile.
 export function closeDB(db: SqliteDatabase): void {
-  try { db.pragma("wal_checkpoint(TRUNCATE)"); } catch {}
   try { db.close(); } catch {}
+}
+
+/**
+ * Periodic PASSIVE WAL checkpoint (upstream #988) so a persist-mode WAL stays
+ * bounded even if the server is killed before the last connection closes.
+ * PASSIVE never blocks. Returns a stop function; a non-positive interval is a no-op.
+ */
+export function startWalCheckpointTimer(db: SqliteDatabase, intervalMs: number): () => void {
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) return () => {};
+  const timer = setInterval(() => {
+    try { db.pragma("wal_checkpoint(PASSIVE)"); } catch { /* busy or closing: next tick */ }
+  }, intervalMs);
+  timer.unref?.();
+  return () => clearInterval(timer);
 }
 
 // Transient SQLite failures worth retrying. SQLITE_IOERR is usually a momentary

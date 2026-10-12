@@ -168,6 +168,10 @@ export function getStore(projectDir: string = getProjectDir()): ContentStore {
   store = new ContentStore(persist ? getStorePath(scope) : ":memory:");
   if (persist) {
     try { store.purgeOlderThan(getTtlHours()); } catch { /* never block a tool call on cleanup */ }
+    // Bound the shared WAL even if this process is killed (upstream #988).
+    // CONTEXT_MODE_WAL_CHECKPOINT_MS tunes it (default 60s); 0 disables.
+    const raw = process.env.CONTEXT_MODE_WAL_CHECKPOINT_MS;
+    store.startCheckpointTimer(raw === undefined ? 60_000 : Number(raw));
   }
   let cachedDenyGlobs: string[][] | undefined;
   let denyCacheResetScheduled = false;

@@ -8,7 +8,7 @@
  * you need EXACT text later — not summaries.
  */
 
-import { openDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, quarantineDBFiles, isSQLiteCorruptionError } from "./db-base.js";
+import { openDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, quarantineDBFiles, isSQLiteCorruptionError, startWalCheckpointTimer } from "./db-base.js";
 import type { PreparedStatement, SqliteDatabase as DatabaseInstance } from "./db-base.js";
 import { readFileSync, unlinkSync, statSync, openSync, fstatSync, closeSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -142,6 +142,7 @@ export class ContentStore {
 
   /** Delete this session's DB files. Call on process exit. */
   cleanup(): void {
+    this.#stopCheckpoints();
     try {
       this.#db.close();
     } catch { /* ignore */ }
@@ -583,8 +584,22 @@ export class ContentStore {
   }
 
   close(): void {
+    this.#stopCheckpoints();
     optimizeFTS(this.#db);
     closeDB(this.#db);
+  }
+
+  #checkpointStop: (() => void) | null = null;
+
+  /** Start periodic PASSIVE WAL checkpoints (persist mode). Replaces any previous timer. */
+  startCheckpointTimer(intervalMs: number): void {
+    this.#stopCheckpoints();
+    this.#checkpointStop = startWalCheckpointTimer(this.#db, intervalMs);
+  }
+
+  #stopCheckpoints(): void {
+    this.#checkpointStop?.();
+    this.#checkpointStop = null;
   }
 
   #extractAndStoreVocabulary(content: string): void {

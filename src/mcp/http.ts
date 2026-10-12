@@ -47,7 +47,7 @@ async function validateModernStandardHeaders(request: Request, parsedBody?: unkn
 
 export function createStrictMcpHttpHandler(factory: () => McpServer): McpHttpHandler {
   const inner = createMcpHandler(factory, {
-    legacy: "reject",
+    legacy: "stateless",
     onerror: (error) => process.stderr.write(`[context-mode] MCP HTTP error: ${error.message}\n`),
   });
   return {

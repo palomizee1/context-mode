@@ -49,7 +49,7 @@ describe("standalone MCP HTTP server", () => {
     expect(body.result?._meta?.["io.modelcontextprotocol/serverInfo"]).toBeDefined();
   });
 
-  test("rejects 2025-era initialize requests", async () => {
+  test("serves 2025-era initialize requests statelessly", async () => {
     const handler = createContextModeHttpHandler();
     const response = await handler.fetch(new Request("http://127.0.0.1:3050/mcp", {
       method: "POST",
@@ -69,8 +69,9 @@ describe("standalone MCP HTTP server", () => {
       }),
     }));
 
-    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(response.status).toBe(200);
     expect(response.headers.get("mcp-session-id")).toBeNull();
+    expect(await response.text()).toContain('"protocolVersion":"2025-11-25"');
   });
 
   test("rejects modern requests missing mandatory protocol headers", async () => {

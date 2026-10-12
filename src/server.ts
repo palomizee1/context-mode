@@ -113,7 +113,7 @@ async function main() {
 
   if (args.transport === "stdio") {
     stdioHandle = serveStdio(() => createContextModeServer(), {
-      legacy: "reject",
+      legacy: "serve",
       onerror: (error) => process.stderr.write(`[context-mode] stdio error: ${error.message}\n`),
     });
     if (process.stdin.isTTY) {

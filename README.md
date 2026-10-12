@@ -120,6 +120,7 @@ pnpm typecheck
 pnpm test
 pnpm build   # typecheck + bundle
 pnpm guard
+pnpm verify  # end-to-end hardening checks against the built bundle
 ```
 
 `server.bundle.mjs` is the committed runtime artifact; CI checks it is up to date.

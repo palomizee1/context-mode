@@ -7,7 +7,8 @@ licensed under the Elastic License 2.0 (see [LICENSE](LICENSE)), incorporating c
 Modifications by palomizee1, 2026: accept 2025-era MCP clients; require a bearer token for the HTTP
 transport; store content outside `~/.claude`; in-memory index by default with a TTL and stale-file sweep for
 on-disk mode; redact secrets before indexing; strip secret-named environment variables from sandboxed code;
-port of upstream pull requests #1087, #1250, #1218, #1286, #1176, #1030, #1076, #968 and #1230 (credited in
+port of upstream pull requests #1087, #1250, #1218, #1286, #1176, #1030, #1076, #968, #1230, #939, #1056,
+#988, #1138, #1172, #1291, #1292 and #1294 (credited in
 the README and commit messages); replace the better-sqlite3 native addon with the built-in node:sqlite;
 guard script and CI.
 

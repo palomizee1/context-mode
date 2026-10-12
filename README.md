@@ -40,6 +40,8 @@ run on a real machine. See [NOTICE.md](NOTICE.md) for licensing and attribution.
 | `CONTEXT_MODE_ENV_PASSTHROUGH` | unset | Comma-separated secret-named env vars that sandboxed code may still see. |
 | `CONTEXT_MODE_DEFAULT_TIMEOUT_MS` | unset (no timeout, see upstream #406) | Timeout for executions that don't pass one. |
 | `CONTEXT_MODE_REDACT` | on | `off` disables secret redaction of indexed content. |
+| `CONTEXT_MODE_WAL_CHECKPOINT_MS` | `60000` | Persist mode: interval for passive WAL checkpoints; `0` disables. |
+| `CONTEXT_MODE_MMAP_SIZE` | `0` (off) | Persist mode: SQLite `mmap_size` in bytes. Off because several server processes may share a DB. |
 
 ### Upstream PRs ported
 
@@ -54,9 +56,18 @@ run on a real machine. See [NOTICE.md](NOTICE.md) for licensing and attribution.
 | [#1076](https://github.com/mksglu/context-mode/pull/1076) | `CONTEXT_MODE_TOOLS` allow-list (fixes #1031) | @alaleiwang |
 | [#968](https://github.com/mksglu/context-mode/pull/968) | Opt-in default exec timeout (fixes #936) | @hakanbaysal |
 | [#1230](https://github.com/mksglu/context-mode/pull/1230) | Accept a singular `query` in `ctx_search` (fixes #1200) | @JoAdo07 |
+| [#939](https://github.com/mksglu/context-mode/pull/939) | `ctx_forget`: delete one indexed source | @KoscheiiB |
+| [#1056](https://github.com/mksglu/context-mode/pull/1056) | mmap opt-in; no TRUNCATE checkpoint on close | @HyeokjaeLee |
+| [#988](https://github.com/mksglu/context-mode/pull/988) | Periodic PASSIVE WAL checkpoint | @alove20 |
+| [#1138](https://github.com/mksglu/context-mode/pull/1138) | HTML tables without rows no longer break fetch | @NickYCLin |
+| [#1172](https://github.com/mksglu/context-mode/pull/1172) | Concise fetch subprocess errors | @7487 |
+| [#1291](https://github.com/mksglu/context-mode/pull/1291) | `**/` matches zero directories in index filters | @rudycelekli |
+| [#1292](https://github.com/mksglu/context-mode/pull/1292) | Nested `.gitignore` rules in directory walks | @rudycelekli |
+| [#1294](https://github.com/mksglu/context-mode/pull/1294) | Contained `..name` symlink targets are followed | @rudycelekli |
 
 [#970](https://github.com/mksglu/context-mode/pull/970) (14-day session retention) is superseded by the TTL
-and sweep above.
+and sweep above. Not ported on purpose: #1091 (oversized legacy rows cannot exist here: every chunk is capped at
+4 KB and older-schema DBs are refused), #1209 (Windows-only), #1041 (proxy passthrough weakens SSRF defences).
 
 ## Install in Claude Code
 
@@ -65,7 +76,7 @@ pnpm install --frozen-lockfile
 pnpm build
 claude mcp add --scope user context-mode \
   -e CONTEXT_MODE_INDEX=ephemeral \
-  -e CONTEXT_MODE_TOOLS=ctx_execute,ctx_execute_file,ctx_batch_execute,ctx_index,ctx_search,ctx_doctor,ctx_purge \
+  -e CONTEXT_MODE_TOOLS=ctx_execute,ctx_execute_file,ctx_batch_execute,ctx_index,ctx_search,ctx_doctor,ctx_forget,ctx_purge \
   -- "$(which node)" "$PWD/server.bundle.mjs"
 ```
 
@@ -103,6 +114,7 @@ uses stateless per-request serving.
 - `ctx_index`, `ctx_search`: index content and search it with SQLite FTS5 (BM25).
 - `ctx_fetch_and_index`: fetch URLs (with SSRF defences), index them, return a preview.
 - `ctx_doctor`: health report.
+- `ctx_forget`: list indexed sources, or delete one by label (`confirm: true`).
 - `ctx_purge`: delete this project's index; needs `confirm: true`.
 
 Calls to the same project may run concurrently; execution preserves request-scoped cwd and cancellation. Child

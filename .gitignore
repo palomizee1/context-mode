@@ -44,3 +44,6 @@ context-mode-guidance-*/
 tools/pricing/litellm-catalog.json
 /.cocoindex_code/
 /.kilo/
+
+# Local planning notes, never commit
+context-mode-fork-handoff.md

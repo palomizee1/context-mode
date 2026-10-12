@@ -16,12 +16,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        # 22.13 is the engines floor (node:sqlite without a flag); 24 is the current LTS.
+        node: ["22.13", "24"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "22"
+          node-version: ${{ matrix.node }}
+      # Older bundled corepack can't verify pnpm against npm's current signing keys.
+      - run: npm install -g corepack@0.34.5
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck

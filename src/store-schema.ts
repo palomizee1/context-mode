@@ -1,4 +1,4 @@
-import type { Database as DatabaseInstance } from "better-sqlite3";
+import type { SqliteDatabase as DatabaseInstance } from "./db-base.js";
 import type { PreparedStatement } from "./db-base.js";
 
 export interface StoreStatements {

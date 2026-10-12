@@ -24,6 +24,8 @@ run on a real machine. See [NOTICE.md](NOTICE.md) for licensing and attribution.
 | Sandbox inherits `GITHUB_TOKEN`, `*_API_KEY`, etc. | Secret-named env vars are stripped unless passed through. |
 | Permission deny rules with `//` or `~/` anchors fail open (#1075) | Fixed. |
 
+| better-sqlite3 native addon (install-time binary download, node-gyp fallback) | Replaced by Node's built-in `node:sqlite`. No native modules; the only runtime dependency is turndown (pure JS, used by `ctx_fetch_and_index`). |
+
 `ci/guard.sh` (also `pnpm guard`) fails CI if any of the removed behaviours come back.
 
 ### Environment variables
@@ -108,6 +110,8 @@ processes inherit the server's OS permissions and are terminated when the reques
 shuts down. `ctx_batch_execute` accepts at most eight commands with bounded output capture.
 
 ## Development
+
+Requires Node.js >= 22.13 built with SQLite FTS5 (official builds are; `ctx_doctor` checks it).
 
 ```bash
 pnpm install --frozen-lockfile

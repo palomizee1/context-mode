@@ -1,4 +1,4 @@
-import type { Database as DatabaseInstance } from "better-sqlite3";
+import type { SqliteDatabase as DatabaseInstance } from "./db-base.js";
 import type { StoreStatements } from "./store-schema.js";
 import { STOPWORDS } from "./store-query.js";
 import type { SearchResult } from "./types.js";

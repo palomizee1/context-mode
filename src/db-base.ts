@@ -1,19 +1,76 @@
-import Database from "better-sqlite3";
-import type { Database as DatabaseInstance } from "better-sqlite3";
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { existsSync, renameSync, unlinkSync } from "node:fs";
 
 export interface PreparedStatement {
-  run(...params: unknown[]): { changes: number; lastInsertRowid: number | bigint };
+  run(...params: unknown[]): { changes: number; lastInsertRowid: number | bigint }; // numbers: readBigInts is off
   get(...params: unknown[]): unknown;
   all(...params: unknown[]): unknown[];
   iterate(...params: unknown[]): IterableIterator<unknown>;
 }
 
-export function loadDatabase(): typeof Database {
-  return Database;
+/** The slice of the better-sqlite3 API the store uses, backed by the built-in node:sqlite. */
+export interface SqliteDatabase {
+  pragma(source: string): void;
+  exec(sql: string): void;
+  prepare(sql: string): PreparedStatement;
+  transaction<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R;
+  close(): void;
 }
 
-export function applyWALPragmas(db: DatabaseInstance): void {
+class NodeSqliteDatabase implements SqliteDatabase {
+  readonly #raw: DatabaseSync;
+  #depth = 0;
+
+  constructor(raw: DatabaseSync) {
+    this.#raw = raw;
+  }
+
+  pragma(source: string): void {
+    this.#raw.prepare(`PRAGMA ${source}`).all();
+  }
+
+  exec(sql: string): void {
+    this.#raw.exec(sql);
+  }
+
+  prepare(sql: string): PreparedStatement {
+    return this.#raw.prepare(sql) as StatementSync as unknown as PreparedStatement;
+  }
+
+  // Like better-sqlite3: BEGIN/COMMIT at the top level, SAVEPOINTs when nested.
+  transaction<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+    return (...args: A): R => {
+      const savepoint = this.#depth > 0 ? `ctx_sp_${this.#depth}` : null;
+      this.#raw.exec(savepoint ? `SAVEPOINT ${savepoint}` : "BEGIN");
+      this.#depth++;
+      try {
+        const result = fn(...args);
+        this.#depth--;
+        this.#raw.exec(savepoint ? `RELEASE ${savepoint}` : "COMMIT");
+        return result;
+      } catch (err) {
+        this.#depth--;
+        try {
+          this.#raw.exec(savepoint ? `ROLLBACK TO ${savepoint}; RELEASE ${savepoint}` : "ROLLBACK");
+        } catch { /* the failure may already have ended the transaction */ }
+        throw err;
+      }
+    };
+  }
+
+  close(): void {
+    this.#raw.close();
+  }
+}
+
+/** Open a database with the built-in node:sqlite (no native addon). */
+export function openDatabase(path: string, opts: { timeout?: number } = {}): SqliteDatabase {
+  const db = new NodeSqliteDatabase(new DatabaseSync(path));
+  if (opts.timeout) db.pragma(`busy_timeout = ${Math.floor(opts.timeout)}`);
+  return db;
+}
+
+export function applyWALPragmas(db: SqliteDatabase): void {
   db.pragma("journal_mode = WAL");
   db.pragma("synchronous = NORMAL");
   db.pragma("busy_timeout = 5000");
@@ -43,7 +100,7 @@ export function deleteDBFiles(dbPath: string): void {
   }
 }
 
-export function closeDB(db: DatabaseInstance): void {
+export function closeDB(db: SqliteDatabase): void {
   try { db.pragma("wal_checkpoint(TRUNCATE)"); } catch {}
   try { db.close(); } catch {}
 }

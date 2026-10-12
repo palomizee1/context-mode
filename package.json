@@ -31,7 +31,7 @@
   ],
   "scripts": {
     "build": "pnpm typecheck && pnpm bundle",
-    "bundle": "esbuild src/server.ts --bundle --platform=node --target=node18 --format=esm --outfile=server.bundle.mjs --external:better-sqlite3 --external:turndown --external:turndown-plugin-gfm --minify",
+    "bundle": "esbuild src/server.ts --bundle --platform=node --target=node22 --format=esm --outfile=server.bundle.mjs --external:turndown --external:turndown-plugin-gfm --minify",
     "dev": "pnpm exec tsx src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -39,12 +39,10 @@
     "guard": "bash ci/guard.sh"
   },
   "dependencies": {
-    "better-sqlite3": "^12.6.2",
     "turndown": "^7.2.0",
     "turndown-plugin-gfm": "^1.0.2"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.11",
     "esbuild": "^0.27.3",
     "tsx": "^4.21.0",
@@ -56,6 +54,6 @@
   },
   "packageManager": "pnpm@10.23.0+sha512.21c4e5698002ade97e4efe8b8b4a89a8de3c85a37919f957e7a0f30f38fbc5bbdd05980ffe29179b2fb6e6e691242e098d945d1601772cad0fef5fb6411e2a4b",
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=22.13.0"
   }
 }

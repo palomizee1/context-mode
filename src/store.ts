@@ -8,9 +8,8 @@
  * you need EXACT text later — not summaries.
  */
 
-import type { Database as DatabaseInstance } from "better-sqlite3";
-import { loadDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, quarantineDBFiles, isSQLiteCorruptionError } from "./db-base.js";
-import type { PreparedStatement } from "./db-base.js";
+import { openDatabase, applyWALPragmas, closeDB, cleanOrphanedWALFiles, withRetry, quarantineDBFiles, isSQLiteCorruptionError } from "./db-base.js";
+import type { PreparedStatement, SqliteDatabase as DatabaseInstance } from "./db-base.js";
 import { readFileSync, unlinkSync, statSync, openSync, fstatSync, closeSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -96,13 +95,12 @@ export class ContentStore {
   #statements!: StoreStatements;
 
   constructor(dbPath?: string) {
-    const Database = loadDatabase();
     this.#dbPath =
       dbPath ?? join(tmpdir(), `context-mode-${process.pid}.db`);
     cleanOrphanedWALFiles(this.#dbPath);
     let db: DatabaseInstance;
     try {
-      db = new Database(this.#dbPath, { timeout: 30000 });
+      db = openDatabase(this.#dbPath, { timeout: 30000 });
       applyWALPragmas(db);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -110,7 +108,7 @@ export class ContentStore {
         const quarantinePath = quarantineDBFiles(this.#dbPath);
         cleanOrphanedWALFiles(this.#dbPath);
         try {
-          db = new Database(this.#dbPath, { timeout: 30000 });
+          db = openDatabase(this.#dbPath, { timeout: 30000 });
           applyWALPragmas(db);
         } catch (retryErr) {
           throw new Error(

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { available, runtimes } from "../app-runtime.js";
 import { getBatchConcurrencyLimit } from "../batch.js";
-import { loadDatabase } from "../db-base.js";
+import { openDatabase, type SqliteDatabase } from "../db-base.js";
 import { PolyglotExecutor, configuredExecutionAdmissionError } from "../executor.js";
 import { advanceProjectGeneration, closeProjectStore, getContentDir, getIndexMode, getProjectDir, getTtlHours, projectHash } from "../project-context.js";
 import type { RegisterTool } from "./registry.js";
@@ -47,10 +47,9 @@ export function registerDiagnosticTools(registerCtxTool: RegisterTool, version: 
         testExecutor.cleanupProcesses();
       }
 
-      let testDb: any;
+      let testDb: SqliteDatabase | undefined;
       try {
-        const Database = loadDatabase();
-        testDb = new Database(":memory:");
+        testDb = openDatabase(":memory:");
         testDb.exec("CREATE VIRTUAL TABLE fts_test USING fts5(content)");
         testDb.exec("INSERT INTO fts_test(content) VALUES ('hello world')");
         const row = testDb.prepare("SELECT content FROM fts_test WHERE fts_test MATCH 'hello'").get() as { content?: string } | undefined;

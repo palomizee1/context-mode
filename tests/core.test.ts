@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { PolyglotExecutor } from "../src/executor.js";
 import { detectRuntimes, getAvailableLanguages, isAllowlistedShell } from "../src/runtime.js";
 import { evaluateFilePath, isPathInsideProject, readToolDenyPatterns } from "../src/security.js";
@@ -81,7 +81,7 @@ describe("persistent core", () => {
   test("rejects unsupported legacy store schemas instead of mutating them", () => {
     const dir = tempDir();
     const dbPath = join(dir, "legacy.db");
-    const db = new Database(dbPath);
+    const db = new DatabaseSync(dbPath);
     db.exec(`
       CREATE TABLE sources (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,7 +103,7 @@ describe("persistent core", () => {
 
     expect(() => new ContentStore(dbPath)).toThrow(/unsupported.*schema|purge.*reindex/i);
 
-    const verify = new Database(dbPath, { readonly: true });
+    const verify = new DatabaseSync(dbPath, { readOnly: true });
     try {
       const chunkColumns = (verify.prepare("PRAGMA table_xinfo('chunks')").all() as Array<{ name: string }>).map((row) => row.name);
       const sourceColumns = (verify.prepare("PRAGMA table_info('sources')").all() as Array<{ name: string }>).map((row) => row.name);

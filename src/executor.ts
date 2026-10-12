@@ -497,13 +497,21 @@ export class PolyglotExecutor {
       "GIT_ASKPASS",          // arbitrary credential command
     ]);
 
+    // Credentials are never inherited by sandboxed code unless named in
+    // CONTEXT_MODE_ENV_PASSTHROUGH (comma-separated).
+    const SECRET_NAME = /(TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|ACCESS_?KEY|PRIVATE_?KEY|CREDENTIALS?|CONNECTION_?STRING|_PAT)$|SECRET|PASSWORD/i;
+    const passthrough = new Set(
+      (process.env.CONTEXT_MODE_ENV_PASSTHROUGH ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+    );
+
     // Start with parent env, then strip dangerous vars and apply overrides.
     const env: Record<string, string> = {};
     for (const [key, val] of Object.entries(process.env)) {
       if (
         val !== undefined &&
         !DENIED.has(key) &&
-        !key.startsWith("BASH_FUNC_")
+        !key.startsWith("BASH_FUNC_") &&
+        (!SECRET_NAME.test(key) || passthrough.has(key))
       ) {
         env[key] = val;
       }

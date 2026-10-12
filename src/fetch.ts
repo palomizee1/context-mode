@@ -325,6 +325,12 @@ async function main() {
     const html = await safeText(resp);
     const td = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
     td.use(gfm);
+    // turndown-plugin-gfm assumes every TABLE has a row and throws otherwise;
+    // keep any non-row content (e.g. a caption) instead.
+    td.addRule('emptyTable', {
+      filter: (node) => node.nodeName === 'TABLE' && node.rows.length === 0,
+      replacement: (content) => content,
+    });
     td.remove(['script', 'style', 'nav', 'header', 'footer', 'noscript']);
     emit('html', td.turndown(html));
     return;

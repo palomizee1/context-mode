@@ -1,6 +1,6 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { relative, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 const defaultGlobalSettingsPath = () => resolve(homedir(), ".claude", "settings.json");
 
@@ -190,6 +190,18 @@ export function readToolPermissionPatterns(
  * still checked. This keeps the function usable for paths that will
  * be created during execution.
  */
+// Expand the two path anchors Claude Code documents for permission patterns
+// (#1075): `//abs/path` is absolute from the filesystem root and `~/rel/path`
+// is relative to the home directory. Without this, deny rules written with
+// either anchor failed open and allow rules failed to unblock their path.
+// Additive: the raw glob stays in the list, so nothing that matched stops matching.
+export function expandGlobAnchors(glob: string): string[] {
+  if (glob.startsWith("//")) return [glob, glob.slice(1)];
+  if (glob === "~") return [glob, homedir()];
+  if (glob.startsWith("~/")) return [glob, join(homedir(), glob.slice(2))];
+  return [glob];
+}
+
 export function evaluateFilePath(
   filePath: string,
   denyGlobs: string[][],
@@ -226,10 +238,13 @@ export function evaluateFilePath(
       // normalized — otherwise a Windows absolute deny rule like
       // `Read(C:\Users\...\secret.env)` parses with literal backslashes that
       // never match a forward-slash candidate.
-      const regex = fileGlobToRegex(toForward(glob), caseInsensitive);
-      for (const candidate of candidates) {
-        if (regex.test(candidate)) {
-          return { denied: true, matchedPattern: glob };
+      for (const variant of expandGlobAnchors(glob)) {
+        const regex = fileGlobToRegex(toForward(variant), caseInsensitive);
+        for (const candidate of candidates) {
+          if (regex.test(candidate)) {
+            // Report the pattern as the user wrote it, not the expansion.
+            return { denied: true, matchedPattern: glob };
+          }
         }
       }
     }

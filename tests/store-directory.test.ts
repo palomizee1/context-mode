@@ -56,3 +56,28 @@ describe("directory walk globstar boundaries", () => {
     expect(walk(root, { include: ["docs/??.md"] })).toHaveLength(1);
   });
 });
+
+// Ported from upstream PR #1292.
+describe("directory walk nested .gitignore scopes", () => {
+  const fixture = () => {
+    const root = makeRoot("ctx-ignore-", [
+      "docs/private.md", "docs/public.md", "other/private.md",
+      "docs/nested/private.md", "docs/nested/root-ignore.md", "other/root-ignore.md",
+    ]);
+    writeFileSync(join(root, ".gitignore"), "root-ignore.md\n");
+    writeFileSync(join(root, "docs", ".gitignore"), "private.md\n");
+    return root;
+  };
+
+  test("nested gitignore rules apply to their own subtree", () => {
+    expect(walk(fixture())).toEqual(["docs/public.md", "other/private.md"]);
+  });
+
+  test("root gitignore rules remain inherited by nested directories", () => {
+    expect(walk(fixture()).some((file) => file.endsWith("root-ignore.md"))).toBe(false);
+  });
+
+  test("respectGitignore false disables root and nested rules", () => {
+    expect(walk(fixture(), { respectGitignore: false }).filter((f) => f.endsWith(".md"))).toHaveLength(6);
+  });
+});

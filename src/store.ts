@@ -18,6 +18,7 @@ import { join } from "node:path";
 import { walkDirectoryDetailed, type WalkOptions } from "./store-directory.js";
 import { initStoreSchema, prepareStoreStatements, type StoreStatements } from "./store-schema.js";
 import { StoreSearchEngine } from "./store-search.js";
+import { redactSecrets } from "./redact.js";
 import {
   extractAndStoreVocabulary,
   getChunksBySource as readChunksBySource,
@@ -359,7 +360,10 @@ export class ContentStore {
     filePath?: string,
     contentHash?: string,
   ): IndexResult {
-    const boundedChunks = enforceChunkByteLimit(chunks);
+    // Redact before anything reaches SQLite; `text` feeds the vocabulary table.
+    const redactedChunks = chunks.map((c) => ({ ...c, title: redactSecrets(c.title), content: redactSecrets(c.content) }));
+    text = redactSecrets(text);
+    const boundedChunks = enforceChunkByteLimit(redactedChunks);
     const codeChunks = boundedChunks.filter((c) => c.hasCode).length;
 
     // Atomic dedup + insert: delete previous source with same label,

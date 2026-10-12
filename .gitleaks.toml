@@ -1,0 +1,7 @@
+# Default gitleaks rules, minus the deliberately fake secrets used to test redaction.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fake secrets in redaction tests"
+paths = ['''^tests/redact\.test\.ts$''']

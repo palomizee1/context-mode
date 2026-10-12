@@ -1,8 +1,9 @@
 {
-  "name": "context-mode",
+  "name": "@palomizee1/context-mode-hardened",
+  "private": true,
   "version": "1.1.1",
   "type": "module",
-  "description": "Standalone context-mode MCP server with stdio and Streamable HTTP transports.",
+  "description": "Hardened fork of the context-mode MCP server: stdio-first, in-memory index, no hooks, no telemetry.",
   "author": "Mert Koseoğlu",
   "license": "Elastic-2.0",
   "keywords": [
@@ -16,10 +17,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/ilkerozgedik/context-mode"
+    "url": "https://github.com/palomizee1/context-mode"
   },
-  "homepage": "https://github.com/ilkerozgedik/context-mode#readme",
-  "bugs": "https://github.com/ilkerozgedik/context-mode/issues",
+  "homepage": "https://github.com/palomizee1/context-mode#readme",
+  "bugs": "https://github.com/palomizee1/context-mode/issues",
   "bin": {
     "context-mode": "./server.bundle.mjs"
   },
@@ -34,7 +35,8 @@
     "dev": "pnpm exec tsx src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "guard": "bash ci/guard.sh"
   },
   "dependencies": {
     "better-sqlite3": "^12.6.2",

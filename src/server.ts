@@ -16,7 +16,7 @@ import { registerFetchTools } from "./tools/fetch.js";
 import { registerBatchTools } from "./tools/batch-execute.js";
 import { registerDiagnosticTools } from "./tools/diagnostics.js";
 import { executor, runtimes } from "./app-runtime.js";
-import { closeStore } from "./project-context.js";
+import { cleanupStaleContentFiles, closeStore, getIndexMode } from "./project-context.js";
 export { withProjectDirOverride } from "./project-context.js";
 export { isDirectExecution } from "./cli.js";
 export { buildFetchCode, classifyIp } from "./fetch.js";
@@ -93,6 +93,7 @@ function cleanupRuntime(): void {
 
 async function main() {
   const args = parseServerArgs(process.argv.slice(2));
+  if (getIndexMode() === "persist") cleanupStaleContentFiles();
   let closing = false;
   let stdioHandle: StdioServerHandle | undefined;
   let httpServer: NodeHttpServer | undefined;

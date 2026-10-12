@@ -17,11 +17,12 @@ export function applyWALPragmas(db: DatabaseInstance): void {
   db.pragma("journal_mode = WAL");
   db.pragma("synchronous = NORMAL");
   db.pragma("busy_timeout = 5000");
+  db.pragma("secure_delete = ON");
   try { db.pragma("mmap_size = 268435456"); } catch {}
 }
 
 export function cleanOrphanedWALFiles(dbPath: string): void {
-  if (existsSync(dbPath)) return;
+  if (dbPath === ":memory:" || existsSync(dbPath)) return;
   for (const suffix of ["-wal", "-shm"]) {
     try { unlinkSync(dbPath + suffix); } catch {}
   }

@@ -5,7 +5,7 @@ import { available, runtimes } from "../app-runtime.js";
 import { getBatchConcurrencyLimit } from "../batch.js";
 import { loadDatabase } from "../db-base.js";
 import { PolyglotExecutor, configuredExecutionAdmissionError } from "../executor.js";
-import { advanceProjectGeneration, closeProjectStore, getContentDir, getProjectDir, projectHash } from "../project-context.js";
+import { advanceProjectGeneration, closeProjectStore, getContentDir, getIndexMode, getProjectDir, getTtlHours, projectHash } from "../project-context.js";
 import type { RegisterTool } from "./registry.js";
 
 export function registerDiagnosticTools(registerCtxTool: RegisterTool, version: string): void {
@@ -25,10 +25,14 @@ export function registerDiagnosticTools(registerCtxTool: RegisterTool, version: 
       lines.push(admission ? `[WARN] Admission: ${admission}` : "[OK] Admission: ready");
       lines.push(`[OK] Limits: min available ${process.env.CONTEXT_MODE_MIN_AVAILABLE_MB ?? "disabled"} MiB; batch concurrency ${getBatchConcurrencyLimit()}`);
 
-      try {
-        lines.push(`[OK] Storage content: ${getContentDir()}`);
-      } catch (err) {
-        lines.push(`[FAIL] Storage content: ${err instanceof Error ? err.message : err}`);
+      if (getIndexMode() === "persist") {
+        try {
+          lines.push(`[OK] Storage content: ${getContentDir()} (persist, TTL ${getTtlHours()}h)`);
+        } catch (err) {
+          lines.push(`[FAIL] Storage content: ${err instanceof Error ? err.message : err}`);
+        }
+      } else {
+        lines.push("[OK] Storage content: ephemeral (in-memory)");
       }
 
       const testExecutor = new PolyglotExecutor({ runtimes });
@@ -94,6 +98,9 @@ export function registerDiagnosticTools(registerCtxTool: RegisterTool, version: 
 
       advanceProjectGeneration();
       closeProjectStore();
+      if (getIndexMode() === "ephemeral") {
+        return { content: [{ type: "text" as const, text: "Purged the in-memory index." }] };
+      }
 
       try {
         const projectDir = getProjectDir();

@@ -537,6 +537,20 @@ export class ContentStore {
     return readDistinctiveTerms(this.#statements, sourceId, maxTerms);
   }
 
+  /** Delete every source (and its chunks) indexed more than `hours` ago. Returns sources removed. */
+  purgeOlderThan(hours: number): number {
+    const rows = this.#db
+      .prepare("SELECT label FROM sources WHERE indexed_at < datetime('now', ?)")
+      .all(`-${hours} hours`) as Array<{ label: string }>;
+    if (rows.length === 0) return 0;
+    this.#db.transaction(() => {
+      for (const row of rows) this.#deleteSourceRows(row.label);
+    })();
+    this.#searchEngine.clearFuzzyCache();
+    try { this.#db.pragma("wal_checkpoint(TRUNCATE)"); } catch { /* ignore */ }
+    return rows.length;
+  }
+
   isEmpty(): boolean {
     return isStoreEmpty(this.#db);
   }

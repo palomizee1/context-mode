@@ -1,10 +1,11 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
-import { accessSync, constants, existsSync, mkdirSync, realpathSync } from "node:fs";
+import { accessSync, constants, existsSync, mkdirSync, readdirSync, realpathSync, statSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { ContentStore } from "./store.js";
 import { evaluateFilePath, readToolDenyPatterns } from "./security.js";
+import { readPositiveEnv } from "./env.js";
 
 type ToolContextOverride = { projectDir: string };
 
@@ -76,6 +77,37 @@ export function resolveProjectPath(filePath: string): string {
   return isAbsolute(filePath) ? filePath : resolve(getProjectDir(), filePath);
 }
 
+export type IndexMode = "ephemeral" | "persist";
+
+/** `ephemeral` (default) keeps each project index in SQLite :memory:; `persist` writes it to the content dir. */
+export function getIndexMode(): IndexMode {
+  return process.env.CONTEXT_MODE_INDEX?.trim().toLowerCase() === "persist" ? "persist" : "ephemeral";
+}
+
+export function getTtlHours(): number {
+  return readPositiveEnv("CONTEXT_MODE_TTL_HOURS", 24);
+}
+
+/** Persist mode: delete content DB files not modified within the TTL, and every corrupt-DB quarantine copy. */
+export function cleanupStaleContentFiles(maxAgeHours: number = getTtlHours()): number {
+  let dir: string;
+  try { dir = getContentDir(); } catch { return 0; }
+  const cutoff = Date.now() - maxAgeHours * 3_600_000;
+  let removed = 0;
+  for (const name of readdirSync(dir)) {
+    const isQuarantine = name.includes(".corrupt-");
+    if (!isQuarantine && !/\.db(-wal|-shm)?$/.test(name)) continue;
+    const path = join(dir, name);
+    try {
+      if (isQuarantine || statSync(path).mtimeMs < cutoff) {
+        unlinkSync(path);
+        removed++;
+      }
+    } catch { /* open by another server instance (Windows) or already gone */ }
+  }
+  return removed;
+}
+
 export function getContentDir(): string {
   const root = process.env.CONTEXT_MODE_DIR?.trim();
   if (root && !isAbsolute(root)) throw new Error("CONTEXT_MODE_DIR must be an absolute path.");
@@ -132,7 +164,11 @@ export function getStore(projectDir: string = getProjectDir()): ContentStore {
     return store;
   }
 
-  store = new ContentStore(getStorePath(scope));
+  const persist = getIndexMode() === "persist";
+  store = new ContentStore(persist ? getStorePath(scope) : ":memory:");
+  if (persist) {
+    try { store.purgeOlderThan(getTtlHours()); } catch { /* never block a tool call on cleanup */ }
+  }
   let cachedDenyGlobs: string[][] | undefined;
   let denyCacheResetScheduled = false;
   store.setDenyChecker((filePath: string) => {

@@ -1,6 +1,7 @@
 import { createMcpHandler, type McpHttpHandler, type McpServer } from "@modelcontextprotocol/server";
 import { localhostHostValidation, localhostOriginValidation, toNodeHandler } from "@modelcontextprotocol/node";
 import { createServer, type IncomingMessage, type Server as NodeHttpServer, type ServerResponse } from "node:http";
+import { timingSafeEqual } from "node:crypto";
 
 const MODERN_PROTOCOL_VERSION = "2026-07-28";
 const PROTOCOL_VERSION_META_KEY = "io.modelcontextprotocol/protocolVersion";
@@ -92,9 +93,18 @@ function writeJsonRpcHttpError(res: ServerResponse, status: number, code: number
   res.end(body);
 }
 
+function hasValidBearer(req: IncomingMessage, token: string): boolean {
+  if (!token) return false;
+  const match = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? "");
+  if (!match) return false;
+  const given = Buffer.from(match[1].trim());
+  const expected = Buffer.from(token);
+  return given.length === expected.length && timingSafeEqual(given, expected);
+}
+
 export function createLoopbackMcpHttpServer(
   handler: McpHttpHandler,
-  options: { version: string; readinessError: () => string | null | undefined },
+  options: { version: string; readinessError: () => string | null | undefined; authToken: string },
 ): NodeHttpServer {
   const validateHost = localhostHostValidation();
   const validateOrigin = localhostOriginValidation();
@@ -144,6 +154,10 @@ export function createLoopbackMcpHttpServer(
     if (path !== "/mcp") {
       res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       res.end("Not Found");
+      return;
+    }
+    if (!hasValidBearer(req, options.authToken)) {
+      writeJsonRpcHttpError(res, 401, -32001, "Unauthorized");
       return;
     }
     if (!validateOrigin(req, res)) return;

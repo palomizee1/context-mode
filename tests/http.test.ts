@@ -149,4 +149,64 @@ describe("standalone MCP HTTP server", () => {
     }
   });
 
+  describe("bearer token on /mcp", () => {
+    const TOKEN = "t".repeat(40);
+    const initBody = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "auth-test", version: "1" } },
+    });
+
+    async function withServer(token: string, fn: (base: string) => Promise<void>) {
+      const server = createContextModeNodeHttpServer(createContextModeHttpHandler(), token);
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", () => resolve());
+      });
+      try {
+        const address = server.address();
+        if (!address || typeof address === "string") throw new Error("missing test server address");
+        await fn(`http://127.0.0.1:${address.port}`);
+      } finally {
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+    }
+
+    function post(base: string, authorization?: string) {
+      const headers: Record<string, string> = {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      };
+      if (authorization) headers.authorization = authorization;
+      return fetch(`${base}/mcp`, { method: "POST", headers, body: initBody });
+    }
+
+    test("rejects a missing token", async () => {
+      await withServer(TOKEN, async (base) => {
+        expect((await post(base)).status).toBe(401);
+      });
+    });
+
+    test("rejects a wrong token", async () => {
+      await withServer(TOKEN, async (base) => {
+        expect((await post(base, `Bearer ${"x".repeat(40)}`)).status).toBe(401);
+      });
+    });
+
+    test("accepts the correct token", async () => {
+      await withServer(TOKEN, async (base) => {
+        expect((await post(base, `Bearer ${TOKEN}`)).status).toBe(200);
+      });
+    });
+
+    test("rejects everything when no token is configured", async () => {
+      await withServer("", async (base) => {
+        expect((await post(base, "Bearer ")).status).toBe(401);
+        expect((await post(base, `Bearer ${TOKEN}`)).status).toBe(401);
+      });
+    });
+  });
+
 });

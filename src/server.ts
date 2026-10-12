@@ -77,10 +77,12 @@ export function createContextModeHttpHandler(): McpHttpHandler {
 
 export function createContextModeNodeHttpServer(
   handler: McpHttpHandler = createContextModeHttpHandler(),
+  authToken: string = process.env.CONTEXT_MODE_HTTP_TOKEN?.trim() ?? "",
 ): NodeHttpServer {
   return createLoopbackMcpHttpServer(handler, {
     version: VERSION,
     readinessError: configuredExecutionAdmissionError,
+    authToken,
   });
 }
 
@@ -121,6 +123,12 @@ async function main() {
       console.error(`Detected runtimes:\n${getRuntimeSummary(runtimes)}`);
     }
     return;
+  }
+
+  const httpToken = process.env.CONTEXT_MODE_HTTP_TOKEN?.trim();
+  if (!httpToken || httpToken.length < 32) {
+    console.error("HTTP transport requires CONTEXT_MODE_HTTP_TOKEN (32+ chars). Use stdio for Claude Code.");
+    process.exit(2);
   }
 
   httpHandler = createContextModeHttpHandler();

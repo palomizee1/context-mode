@@ -7,6 +7,7 @@ import {
 import { capIndexableOutput, INDEX_OUTPUT_CAP_BYTES } from "../output-index.js";
 import { getStore, resolveExecutionProjectDir } from "../project-context.js";
 import { formatBatchQueryResults } from "../search-format.js";
+import { charSafePrefix } from "../truncate.js";
 import type { RegisterTool } from "./registry.js";
 
 export function registerBatchTools(registerCtxTool: RegisterTool): void {
@@ -105,10 +106,9 @@ export function registerBatchTools(registerCtxTool: RegisterTool): void {
 
         // Index into knowledge base — markdown heading chunking splits by # labels
         const store = getStore(projectDir);
-        const source = `batch:${commands
+        const source = `batch:${charSafePrefix(commands
           .map((c: { label: string; command: string }) => c.label)
-          .join(",")
-          .slice(0, 80)}`;
+          .join(","), 80)}`;
         const indexed = store.index({ content: indexable.text, source });
 
         // Run all search queries — default scope is batch-local.

@@ -1,4 +1,5 @@
 import type { ContentStore } from "./store.js";
+import { charSafePrefix, charSafeSlice } from "./truncate.js";
 
 // Build description dynamically based on detected runtimes
 // ─────────────────────────────────────────────────────────
@@ -83,7 +84,7 @@ export function extractSnippet(
 
   // No matches at all — return prefix
   if (positions.length === 0) {
-    return content.slice(0, maxLen) + "\n…";
+    return charSafePrefix(content, maxLen) + "\n…";
   }
 
   // Sort positions, merge overlapping windows
@@ -106,7 +107,7 @@ export function extractSnippet(
   let total = 0;
   for (const [start, end] of windows) {
     if (total >= maxLen) break;
-    const part = content.slice(start, Math.min(end, start + (maxLen - total)));
+    const part = charSafeSlice(content, start, Math.min(end, start + (maxLen - total)));
     parts.push(
       (start > 0 ? "…" : "") + part + (end < content.length ? "…" : ""),
     );

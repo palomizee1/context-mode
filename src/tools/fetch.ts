@@ -6,6 +6,7 @@ import { fetchOneUrl, indexFetched, type FetchOneResult, type IndexedFetchResult
 import { getProjectGeneration } from "../project-context.js";
 import { runPool, type PoolJob } from "../runPool.js";
 import type { RegisterTool } from "./registry.js";
+import { charSafePrefix } from "../truncate.js";
 
 function abortReason(signal: AbortSignal): Error {
   return signal.reason instanceof Error ? signal.reason : new Error("Request cancelled");
@@ -124,7 +125,7 @@ export function registerFetchTools(registerCtxTool: RegisterTool): void {
           const kb = (r.indexed.totalBytes / 1024).toFixed(1);
           lines.push(`- [new]   ${r.indexed.label} — ${r.indexed.totalChunks} sections (${kb}KB)`);
           const snippet = r.indexed.preview.length > FETCH_BATCH_PREVIEW_LIMIT
-            ? r.indexed.preview.slice(0, FETCH_BATCH_PREVIEW_LIMIT).trimEnd() + "…"
+            ? charSafePrefix(r.indexed.preview, FETCH_BATCH_PREVIEW_LIMIT).trimEnd() + "…"
             : r.indexed.preview;
           snippets.push(`### ${r.indexed.label}\n\n${snippet}`);
         } else {

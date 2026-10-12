@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
@@ -79,5 +79,22 @@ describe("directory walk nested .gitignore scopes", () => {
 
   test("respectGitignore false disables root and nested rules", () => {
     expect(walk(fixture(), { respectGitignore: false }).filter((f) => f.endsWith(".md"))).toHaveLength(6);
+  });
+});
+
+// Ported from upstream PR #1294.
+describe("directory walk symlink containment", () => {
+  const linkType = process.platform === "win32" ? "junction" : "dir";
+
+  test("a contained symlink target beginning with two dots is followed", () => {
+    const root = makeRoot("ctx-dot-link-", ["..notes/content.md"]);
+    symlinkSync(join(root, "..notes"), join(root, "alias"), linkType);
+    expect(walk(root, { followSymlinks: true, include: ["alias/*.md"] })).toEqual(["alias/content.md"]);
+  });
+
+  test("a parent-directory symlink remains rejected", () => {
+    const root = makeRoot("ctx-parent-link-", ["outside.md", "project/keep.md"]);
+    symlinkSync(root, join(root, "project", "alias"), linkType);
+    expect(walk(join(root, "project"), { followSymlinks: true, include: ["alias/*.md"] })).toEqual([]);
   });
 });

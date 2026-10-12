@@ -340,7 +340,11 @@ async function main() {
   const text = await safeText(resp);
   emit('text', text);
 }
-main();
+main().catch((err) => {
+  // One concise line (the network cause when present) instead of a Node crash stack.
+  console.error(err?.cause?.message ?? err?.message ?? String(err));
+  process.exitCode = 1;
+});
 `;
 }
 

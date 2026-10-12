@@ -2,7 +2,7 @@ import { spawn, execSync, execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { readPositiveEnv } from "./env.js";
+import { readPositiveEnv, readPositiveIntEnv } from "./env.js";
 import {
   detectRuntimes,
   buildCommand,
@@ -316,7 +316,12 @@ export class PolyglotExecutor {
   }
 
   async execute(opts: ExecuteOptions): Promise<ExecResult> {
-    const { language, code, timeout, cwd: cwdOverride, signal, captureLimitBytes } = opts;
+    const { language, code, cwd: cwdOverride, signal, captureLimitBytes } = opts;
+    // Issue #406: no built-in timeout by default. CONTEXT_MODE_DEFAULT_TIMEOUT_MS
+    // opts in to a bound for calls that pass none (#936).
+    const timeout = opts.timeout ?? (process.env.CONTEXT_MODE_DEFAULT_TIMEOUT_MS
+      ? readPositiveIntEnv("CONTEXT_MODE_DEFAULT_TIMEOUT_MS", 120_000)
+      : undefined);
     const admissionError = configuredExecutionAdmissionError();
     if (admissionError) throw new Error(admissionError);
     const tmpDir = mkdtempSync(join(OS_TMPDIR, ".ctx-mode-"));

@@ -15,6 +15,7 @@ const EXPECTED_TOOLS = [
   "ctx_fetch_and_index",
   "ctx_batch_execute",
   "ctx_doctor",
+  "ctx_forget",
   "ctx_purge",
 ];
 

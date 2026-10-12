@@ -5,7 +5,7 @@ import { available, runtimes } from "../app-runtime.js";
 import { getBatchConcurrencyLimit } from "../batch.js";
 import { openDatabase, type SqliteDatabase } from "../db-base.js";
 import { PolyglotExecutor, configuredExecutionAdmissionError } from "../executor.js";
-import { advanceProjectGeneration, closeProjectStore, getContentDir, getIndexMode, getProjectDir, getTtlHours, projectHash } from "../project-context.js";
+import { advanceProjectGeneration, closeProjectStore, getContentDir, getIndexMode, getProjectDir, getStore, getTtlHours, projectHash } from "../project-context.js";
 import type { RegisterTool } from "./registry.js";
 
 export function registerDiagnosticTools(registerCtxTool: RegisterTool, version: string): void {
@@ -78,6 +78,42 @@ export function registerDiagnosticTools(registerCtxTool: RegisterTool, version: 
     }
     return deleted;
   }
+
+  // ── ctx-forget: delete one indexed source (upstream PR #939) ──────────────
+  registerCtxTool(
+    "ctx_forget",
+    {
+      title: "Forget Indexed Source",
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+      description: "Delete one indexed source by label (confirm:true), or list sources when source is omitted.",
+      inputSchema: z.object({
+        cwd: z.string().optional().describe("Project scope."),
+        source: z.string().optional().describe("Exact source label; omit to list."),
+        confirm: z.boolean().optional().describe("Must be true to delete."),
+      }),
+    },
+    async ({ source, confirm }) => {
+      const store = getStore();
+      const listText = (): string => {
+        const sources = store.listSources();
+        if (sources.length === 0) return "No indexed sources.";
+        return `Indexed sources (${sources.length}):\n${sources
+          .map((s) => `  - ${s.label} (${s.chunkCount} chunk${s.chunkCount === 1 ? "" : "s"})`)
+          .join("\n")}`;
+      };
+      if (!source) return { content: [{ type: "text" as const, text: listText() }] };
+      if (!confirm) {
+        return { content: [{ type: "text" as const, text: `Cancelled. Pass confirm: true to delete source '${source}'.` }] };
+      }
+      const { existed, deletedChunks } = store.deleteSource(source);
+      if (!existed) {
+        return { content: [{ type: "text" as const, text: `No such source: '${source}'.\n\n${listText()}` }], isError: true };
+      }
+      return {
+        content: [{ type: "text" as const, text: `Forgot source '${source}': removed ${deletedChunks} chunk${deletedChunks === 1 ? "" : "s"}.` }],
+      };
+    },
+  );
 
   registerCtxTool(
     "ctx_purge",

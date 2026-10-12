@@ -546,6 +546,24 @@ export class ContentStore {
     return readDistinctiveTerms(this.#statements, sourceId, maxTerms);
   }
 
+  /** All indexed sources with their chunk counts, oldest first. */
+  listSources(): Array<{ label: string; chunkCount: number }> {
+    const rows = this.#db
+      .prepare("SELECT label, chunk_count FROM sources ORDER BY id")
+      .all() as Array<{ label: string; chunk_count: number }>;
+    return rows.map((r) => ({ label: r.label, chunkCount: r.chunk_count }));
+  }
+
+  /** Delete one source (and its chunks) by exact label. */
+  deleteSource(label: string): { existed: boolean; deletedChunks: number } {
+    const meta = this.getSourceMeta(label);
+    if (!meta) return { existed: false, deletedChunks: 0 };
+    withRetry(() => this.#db.transaction(() => this.#deleteSourceRows(label))());
+    this.#searchEngine.clearFuzzyCache();
+    try { this.#db.pragma("wal_checkpoint(TRUNCATE)"); } catch { /* ignore */ }
+    return { existed: true, deletedChunks: meta.chunkCount };
+  }
+
   /** Delete every source (and its chunks) indexed more than `hours` ago. Returns sources removed. */
   purgeOlderThan(hours: number): number {
     const rows = this.#db

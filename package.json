@@ -1,7 +1,7 @@
 {
   "name": "@palomizee1/context-mode-hardened",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.1.1-hardened.1",
   "type": "module",
   "description": "Hardened fork of the context-mode MCP server: stdio-first, in-memory index, no hooks, no telemetry.",
   "author": "Mert Koseoğlu",

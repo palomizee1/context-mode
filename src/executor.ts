@@ -1,5 +1,5 @@
 import { spawn, execSync, execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { readPositiveEnv } from "./env.js";
@@ -267,6 +267,14 @@ interface ExecuteFileOptions extends ExecuteOptions {
   path: string;
 }
 
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 export class PolyglotExecutor {
   #hardCapBytes: number;
   /**
@@ -328,8 +336,16 @@ export class PolyglotExecutor {
       // the chosen language. Unifying cwd removes that surprise.
       // Issue #45 — `cwdOverride` lets per-call sites (Codex MCP handlers) pin
       // cwd without mutating process-wide state.
-      const cwd = cwdOverride ?? this.#projectRoot;
+      const preferred = cwdOverride ?? this.#projectRoot;
+      // The project directory can disappear while the server runs (the checkout is
+      // deleted or moved). Spawning into it fails with "spawn <runtime> ENOENT", which
+      // wrongly blames the runtime; run in the sandbox instead and say so.
+      const cwdExists = isDirectory(preferred);
+      const cwd = cwdExists ? preferred : tmpDir;
       const result = await this.#spawn(cmd, cwd, tmpDir, timeout, signal, captureLimitBytes);
+      if (!cwdExists) {
+        result.stderr = `[context-mode] project directory ${preferred} no longer exists; ran in a temporary directory instead.\n${result.stderr}`;
+      }
       cleanupTmpDir(tmpDir);
       return result;
     } catch (err) {
@@ -560,6 +576,10 @@ export class PolyglotExecutor {
     env["PYTHONUNBUFFERED"] = "1";
     env["PYTHONUTF8"] = "1";
     env["NO_COLOR"] = "1";
+    // A parent that exports FORCE_COLOR / CLICOLOR_FORCE overrides NO_COLOR in Bun, Node
+    // and most CLIs, which leaks ANSI escapes into tool output.
+    delete env["FORCE_COLOR"];
+    delete env["CLICOLOR_FORCE"];
     // Windows uses "Path" (not "PATH") — normalize to "PATH" for consistency
     if (isWin && !env["PATH"] && env["Path"]) {
       env["PATH"] = env["Path"];

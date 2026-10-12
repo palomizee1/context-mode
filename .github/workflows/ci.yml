@@ -16,8 +16,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        # 22.13 is the engines floor (node:sqlite without a flag); 24 is the current LTS.
-        node: ["22.13", "24"]
+        # 22.16 is the engines floor (first 22.x whose node:sqlite has FTS5); 24 is the current LTS.
+        node: ["22.16", "24"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

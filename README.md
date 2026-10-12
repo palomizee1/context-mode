@@ -111,7 +111,8 @@ shuts down. `ctx_batch_execute` accepts at most eight commands with bounded outp
 
 ## Development
 
-Requires Node.js >= 22.13 built with SQLite FTS5 (official builds are; `ctx_doctor` checks it).
+Requires Node.js `^22.16.0 || >=24`: the first official builds whose `node:sqlite` includes FTS5 (22.13–22.15
+and all of 23.x lack it). `ctx_doctor` checks it.
 
 ```bash
 pnpm install --frozen-lockfile

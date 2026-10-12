@@ -120,7 +120,14 @@ export class ContentStore {
       }
     }
     this.#db = db;
-    initStoreSchema(this.#db);
+    try {
+      initStoreSchema(this.#db);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("no such module: fts5")) {
+        throw new Error(`This Node.js ${process.version} build's node:sqlite lacks FTS5; use Node ^22.16.0 or >=24.`);
+      }
+      throw err;
+    }
     const statements = prepareStoreStatements(this.#db);
     this.#statements = statements;
     this.#stmtInsertSourceEmpty = statements.stmtInsertSourceEmpty;

@@ -218,13 +218,21 @@ export function registerIndexingTools(registerCtxTool: RegisterTool): void {
       description: "Search indexed content; batch related queries.",
       inputSchema: z.object({
         cwd: z.string().optional().describe("Project scope."),
-        queries: z.array(z.string()).min(1).describe("Queries; batch related questions."),
+        queries: z.array(z.string()).min(1).optional().describe("Queries; batch related questions."),
+        query: z.string().optional().describe("Single query; same as queries: [query]."),
         limit: z.coerce.number().int().min(1).optional().default(3).describe("Results/query (default 3)."),
         source: z.string().optional().describe("Source filter (partial match)."),
         contentType: z.enum(["code", "prose"]).optional().describe("Content type."),
       }),
     },
-    async ({ queries, limit = 3, source, contentType }) => {
+    async ({ queries: queryList, query, limit = 3, source, contentType }) => {
+      const queries = queryList ?? (query?.trim() ? [query] : undefined);
+      if (!queries) {
+        return {
+          content: [{ type: "text" as const, text: "Provide queries: [\"...\"] (or a single query)." }],
+          isError: true,
+        };
+      }
       try {
         const store = getStore();
         if (store.isEmpty()) {
